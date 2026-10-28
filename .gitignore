@@ -11,3 +11,4 @@ obj/
 *.bak
 *.cache
 план.txt
+.mimosa/
