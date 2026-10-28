@@ -1,31 +1,39 @@
 using System;
 using System.IO;
-using System.Windows.Forms;
+using System.Threading.Tasks;
+using Avalonia;
 
-static void LogCrash(string text)
+public static class Program
 {
-    try
+    private static void LogCrash(string? text)
     {
-        string logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ccvfs_crash.txt");
-        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {text}{Environment.NewLine}");
+        try
+        {
+            string logPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ccvfs_crash.txt");
+            File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss}] {text}{Environment.NewLine}");
+        }
+        catch { }
     }
-    catch { }
+
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        // Перехватчик исключений в других потоках
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            LogCrash(e.ExceptionObject.ToString());
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            LogCrash(e.Exception.ToString());
+            e.SetObserved();
+        };
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<CCVFS.App>()
+            .UsePlatformDetect()
+            .LogToTrace();
 }
-
-// Перехватчик исключений в UI-потоке (async void, обработчики событий)
-Application.ThreadException += (_, e) =>
-{
-    LogCrash(e.Exception.ToString());
-    MessageBox.Show(e.Exception.Message, "Необработанная ошибка",
-        MessageBoxButtons.OK, MessageBoxIcon.Error);
-};
-
-// Перехватчик исключений в других потоках
-AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-    LogCrash(e.ExceptionObject.ToString());
-
-Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-Application.EnableVisualStyles();
-Application.SetCompatibleTextRenderingDefault(false);
-Application.Run(new MainForm());
